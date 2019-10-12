@@ -57,7 +57,7 @@ public class SensorSever : MonoBehaviour {
         Debug.Log ($"{data.ax:F3}");
         target.transform.rotation = Quaternion.Euler (AX, AY, AZ);
         string datastr = "AX:" + $"{data.ax:F3}" + " AY:" + $"{data.ay:F3}" + " AZ:" + $"{data.az:F3}" + "\n";
-        datastr += "LX:" + $"{data.Lx:F3}" + " LY:" + $"{data.Ly:F3}" + " LZ:" + $"{data.Lz:F3}" + "\n";
+        datastr += "LX:" + $"{data.lx:F3}" + " LY:" + $"{data.ly:F3}" + " LZ:" + $"{data.lz:F3}" + "\n";
         datastr += "GX:" + $"{data.gx:F3}" + " GY:" + $"{data.gy:F3}" + " GZ:" + $"{data.gz:F3}" + "\n";
         dataText.text = datastr;
     }
