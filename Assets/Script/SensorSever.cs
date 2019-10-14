@@ -10,7 +10,14 @@ public class SensorSever : MonoBehaviour {
     GameObject target;
     [SerializeField]
     Text dataText;
+    [SerializeField]
+    InputField address; //url
+    [SerializeField]
+    Text consoleText;
+    private string serverurl = "http://localhost:3000/";
     void Start () {
+        address.text = serverurl;
+        StartCoroutine (ServerTest ());
         StartCoroutine (GetSensorData ());
 
         //StartCoroutine (PostServerData ());
@@ -19,14 +26,14 @@ public class SensorSever : MonoBehaviour {
     // Update is called once per frame
     void Update () {
         deltatime += Time.deltaTime;
-        if (deltatime > 3.0f) {
+        if (deltatime > 1.0f) {
             StartCoroutine (GetSensorData ());
-            deltatime -= 3.0f;
+            deltatime -= 1.0f;
         }
     }
     //SensorData取得通信
     IEnumerator GetSensorData () {
-        UnityWebRequest req = UnityWebRequest.Get ("http://localhost:3000/sensorData");
+        UnityWebRequest req = UnityWebRequest.Get (serverurl + "sensorData");
         req.SetRequestHeader ("key", "KEY");
         yield return req.SendWebRequest ();
         if (req.isNetworkError) {
@@ -51,11 +58,15 @@ public class SensorSever : MonoBehaviour {
         float AY = (data.ay * 18) + 90.0f;
         //az 0-10を想定
         float AZ = -((data.az * 18) - 90.0f);
-        Debug.Log (data.ax + " : " + AX);
-        Debug.Log (data.ay + " : " + AY);
-        Debug.Log (data.az + " : " + AZ);
+        //gx -1-1を想定
+        float GX = ((data.gx + 1.0f) * 180) - 90.0f;
+        //gy -1-1を想定
+        float GY = ((data.gy + 1.0f) * 180);
+        //gz -1-1を想定
+        float GZ = ((data.gz + 1.0f) * 180);
+
         Debug.Log ($"{data.ax:F3}");
-        target.transform.rotation = Quaternion.Euler (AX, AY, AZ);
+        target.transform.rotation = Quaternion.Euler (90, 180, 0) * (new Quaternion (-data.gx, -data.gy, data.gz, 0));;
         string datastr = "AX:" + $"{data.ax:F3}" + " AY:" + $"{data.ay:F3}" + " AZ:" + $"{data.az:F3}" + "\n";
         datastr += "LX:" + $"{data.lx:F3}" + " LY:" + $"{data.ly:F3}" + " LZ:" + $"{data.lz:F3}" + "\n";
         datastr += "GX:" + $"{data.gx:F3}" + " GY:" + $"{data.gy:F3}" + " GZ:" + $"{data.gz:F3}" + "\n";
@@ -68,7 +79,7 @@ public class SensorSever : MonoBehaviour {
         form.AddField ("myField", "myData");
         form.AddField ("newxt", 20);
 
-        using (UnityWebRequest req = UnityWebRequest.Post ("http://localhost:3000/Post", form)) {
+        using (UnityWebRequest req = UnityWebRequest.Post (serverurl + "Post", form)) {
             yield return req.SendWebRequest ();
 
             if (req.isNetworkError) {
@@ -77,5 +88,25 @@ public class SensorSever : MonoBehaviour {
                 Debug.Log ("Form upload complete!");
             }
         }
+    }
+    IEnumerator ServerTest () {
+        consoleText.text = "No Server";
+        UnityWebRequest req = UnityWebRequest.Get (serverurl + "tests");
+        req.SetRequestHeader ("key", "KEY");
+        req.timeout = 10;
+        yield return req.SendWebRequest ();
+        if (req.isNetworkError) {
+            Debug.Log (req.error);
+            consoleText.text = req.error;
+        } else {
+            if (req.responseCode == 200) {
+                //OK
+            }
+        }
+        consoleText.text = "responceCode:" + req.responseCode.ToString ();
+    }
+    public void OnClickSetServer () {
+        serverurl = address.text;
+        StartCoroutine (ServerTest ());
     }
 }
