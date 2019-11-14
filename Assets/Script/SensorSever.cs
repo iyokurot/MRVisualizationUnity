@@ -3,6 +3,11 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.UI;
+using uPLibrary.Networking.M2Mqtt;
+using uPLibrary.Networking.M2Mqtt.Messages;
+using uPLibrary.Networking.M2Mqtt.Utility;
+using uPLibrary.Networking.M2Mqtt.Exceptions;
+
 
 public class SensorSever : MonoBehaviour {
     private float deltatime = 0;
@@ -28,6 +33,7 @@ public class SensorSever : MonoBehaviour {
         deltatime += Time.deltaTime;
         if (deltatime > 1.0f) {
             StartCoroutine (GetSensorData ());
+            MqttTest();
             deltatime -= 1.0f;
         }
     }
@@ -108,5 +114,21 @@ public class SensorSever : MonoBehaviour {
     public void OnClickSetServer () {
         serverurl = address.text;
         StartCoroutine (ServerTest ());
+    }
+    void MqttTest(){
+        MqttClient client = new MqttClient("192.168.1.4", 1883 , false , null);
+            client.MqttMsgPublishReceived += (sender, eventArgs) =>
+                {
+                    var msg = Encoding.UTF8.GetString(eventArgs.Message);
+                    var topic = eventArgs.Topic;
+                    Debug.Log(topic + ", " + msg);
+                };
+            var ret = client.Connect(Guid.NewGuid().ToString());
+            Console.WriteLine("Connected with result code {0}", ret);
+            client.Subscribe(new[] { "itoyuNineAxis" }, new[] { MqttMsgBase.QOS_LEVEL_EXACTLY_ONCE });
+            while (client.IsConnected)
+            {
+            }
+
     }
 }
