@@ -3,11 +3,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.UI;
-using uPLibrary.Networking.M2Mqtt;
-using uPLibrary.Networking.M2Mqtt.Messages;
-using uPLibrary.Networking.M2Mqtt.Utility;
-using uPLibrary.Networking.M2Mqtt.Exceptions;
-
+using MQTTnet;
+using MQTTnet.Client;
+using UniRx;
 
 public class SensorSever : MonoBehaviour {
     private float deltatime = 0;
@@ -20,12 +18,22 @@ public class SensorSever : MonoBehaviour {
     [SerializeField]
     Text consoleText;
     private string serverurl = "http://localhost:3000/";
+    //IMqttClient mqttClient;
+    [SerializeField]
+    private MqttController mqttController;
+
     void Start () {
         address.text = serverurl;
         StartCoroutine (ServerTest ());
         StartCoroutine (GetSensorData ());
 
         //StartCoroutine (PostServerData ());
+        //MqttTest();
+        mqttController.OnMessageReceived.Subscribe (message =>
+        {
+            Debug.Log(message);
+            //データ成型
+        });
     }
 
     // Update is called once per frame
@@ -33,7 +41,7 @@ public class SensorSever : MonoBehaviour {
         deltatime += Time.deltaTime;
         if (deltatime > 1.0f) {
             StartCoroutine (GetSensorData ());
-            MqttTest();
+            
             deltatime -= 1.0f;
         }
     }
@@ -71,7 +79,7 @@ public class SensorSever : MonoBehaviour {
         //gz -1-1を想定
         float GZ = ((data.gz + 1.0f) * 180);
 
-        Debug.Log ($"{data.ax:F3}");
+        //Debug.Log ($"{data.ax:F3}");
         target.transform.rotation = Quaternion.Euler (90, 180, 0) * (new Quaternion (-data.gx, -data.gy, data.gz, 0));;
         string datastr = "AX:" + $"{data.ax:F3}" + " AY:" + $"{data.ay:F3}" + " AZ:" + $"{data.az:F3}" + "\n";
         datastr += "LX:" + $"{data.lx:F3}" + " LY:" + $"{data.ly:F3}" + " LZ:" + $"{data.lz:F3}" + "\n";
@@ -115,7 +123,10 @@ public class SensorSever : MonoBehaviour {
         serverurl = address.text;
         StartCoroutine (ServerTest ());
     }
-    void MqttTest(){
+    /*
+    async void MqttTest(){
+        Debug.Log("start");
+        
         MqttClient client = new MqttClient("192.168.1.4", 1883 , false , null);
             client.MqttMsgPublishReceived += (sender, eventArgs) =>
                 {
@@ -129,6 +140,46 @@ public class SensorSever : MonoBehaviour {
             while (client.IsConnected)
             {
             }
+            
+            var factory = new MqttFactory ();
+        mqttClient = factory.CreateMqttClient ();
+
+        var options = new MqttClientOptionsBuilder ()
+            .WithTcpServer ("192.168.1.4",  1883)
+            .WithClientId ("Unity.client")//Guid.NewGuid ().ToString ())
+            .WithCredentials ("your_MQTT_username", "your_MQTT_password")
+            .WithTls ()
+            .Build ();
+
+        mqttClient.Connected += async (s, e) =>
+        {
+            Debug.Log ("MQTTブローカに接続しました");
+            await mqttClient.SubscribeAsync (
+                new TopicFilterBuilder ()
+                .WithTopic ("itoyuNineAxis")
+                .Build ());
+            Debug.Log ("指定したトピックをSubscribeしました");
+        };
+        mqttClient.Disconnected += async (s, e) =>
+        {
+            if (e.Exception == null)
+            {
+                Debug.Log ("サーバとの通信を切断しました");
+                return;
+            }
+
+            Debug.Log ("サーバから切断されました。5秒後に再接続します");
+        };
+        mqttClient.ApplicationMessageReceived += (s, e) =>
+        {
+            var message = System.Text.Encoding.UTF8.GetString (e.ApplicationMessage.Payload);
+            Debug.Log ($"メッセージ受信 : {message}");
+            
+        };
+
+        await mqttClient.ConnectAsync (options);
+
 
     }
+    */
 }
