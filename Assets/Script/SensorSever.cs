@@ -1,11 +1,11 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.Networking;
-using UnityEngine.UI;
 using MQTTnet;
 using MQTTnet.Client;
 using UniRx;
+using UnityEngine;
+using UnityEngine.Networking;
+using UnityEngine.UI;
 
 public class SensorSever : MonoBehaviour {
     private float deltatime = 0;
@@ -17,33 +17,68 @@ public class SensorSever : MonoBehaviour {
     InputField address; //url
     [SerializeField]
     Text consoleText;
+    [SerializeField]
+    Text warningText;
+    [SerializeField]
+    GameObject spotLight;
     private string serverurl = "http://localhost:3000/";
     //IMqttClient mqttClient;
     [SerializeField]
     private MqttController mqttController;
+    [SerializeField]
+    private MqttEulerController mqttEuler;
+    NineAxis axisdata;
+    Euler eulerdata;
 
     void Start () {
         address.text = serverurl;
+        warningText.text = "";
         StartCoroutine (ServerTest ());
-        StartCoroutine (GetSensorData ());
+        //express経由のデータ取得
+        //StartCoroutine (GetSensorData ());
 
         //StartCoroutine (PostServerData ());
-        //MqttTest();
-        mqttController.OnMessageReceived.Subscribe (message =>
-        {
-            Debug.Log(message);
-            //データ成型
-        });
+        mqttController.setHost ("192.168.1.6");
     }
 
     // Update is called once per frame
     void Update () {
         deltatime += Time.deltaTime;
         if (deltatime > 1.0f) {
-            StartCoroutine (GetSensorData ());
-            
+            //StartCoroutine (GetSensorData ());
+            setTarget (axisdata);
+
             deltatime -= 1.0f;
         }
+        if (eulerdata != null) {
+            SetTargetEuler (eulerdata);
+        }
+
+        //MqttTest();
+        mqttController.OnMessageReceived.Subscribe (message => {
+            //データ成型
+            string json = "";
+            string[] arr = message.Split ('{');
+            json = string.Join ("{\"", arr);
+            string[] semiArr = json.Split (':');
+            json = string.Join ("\":", semiArr);
+            string[] comArr = json.Split (',');
+            json = string.Join (",\"", comArr);
+            NineAxis list = JsonUtility.FromJson<NineAxis> (json);
+            axisdata = list;
+        });
+        mqttEuler.OnMessageReceived.Subscribe (message => {
+            //データ成型
+            string json = "";
+            string[] arr = message.Split ('{');
+            json = string.Join ("{\"", arr);
+            string[] semiArr = json.Split (':');
+            json = string.Join ("\":", semiArr);
+            string[] comArr = json.Split (',');
+            json = string.Join (",\"", comArr);
+            Euler data = JsonUtility.FromJson<Euler> (json);
+            eulerdata = data;
+        });
     }
     //SensorData取得通信
     IEnumerator GetSensorData () {
@@ -80,11 +115,21 @@ public class SensorSever : MonoBehaviour {
         float GZ = ((data.gz + 1.0f) * 180);
 
         //Debug.Log ($"{data.ax:F3}");
-        target.transform.rotation = Quaternion.Euler (90, 180, 0) * (new Quaternion (-data.gx, -data.gy, data.gz, 0));;
+        //target.transform.rotation = Quaternion.Euler (90, 180, 0) * (new Quaternion (-data.gx, -data.gy, data.gz, 0));;
         string datastr = "AX:" + $"{data.ax:F3}" + " AY:" + $"{data.ay:F3}" + " AZ:" + $"{data.az:F3}" + "\n";
         datastr += "LX:" + $"{data.lx:F3}" + " LY:" + $"{data.ly:F3}" + " LZ:" + $"{data.lz:F3}" + "\n";
         datastr += "GX:" + $"{data.gx:F3}" + " GY:" + $"{data.gy:F3}" + " GZ:" + $"{data.gz:F3}" + "\n";
         dataText.text = datastr;
+    }
+    void SetTargetEuler (Euler euler) {
+        target.transform.rotation = Quaternion.Euler (euler.pitch, euler.head, euler.roll);
+        if (eulerdata.pitch < -30.0f) {
+            warningText.text = "Warning!\n危険な体勢です！";
+            spotLight.SetActive (true);
+        } else {
+            warningText.text = "";
+            spotLight.SetActive (false);
+        }
     }
     //Post通信テスト
     IEnumerator PostServerData () {
@@ -123,63 +168,4 @@ public class SensorSever : MonoBehaviour {
         serverurl = address.text;
         StartCoroutine (ServerTest ());
     }
-    /*
-    async void MqttTest(){
-        Debug.Log("start");
-        
-        MqttClient client = new MqttClient("192.168.1.4", 1883 , false , null);
-            client.MqttMsgPublishReceived += (sender, eventArgs) =>
-                {
-                    var msg = Encoding.UTF8.GetString(eventArgs.Message);
-                    var topic = eventArgs.Topic;
-                    Debug.Log(topic + ", " + msg);
-                };
-            var ret = client.Connect(Guid.NewGuid().ToString());
-            Console.WriteLine("Connected with result code {0}", ret);
-            client.Subscribe(new[] { "itoyuNineAxis" }, new[] { MqttMsgBase.QOS_LEVEL_EXACTLY_ONCE });
-            while (client.IsConnected)
-            {
-            }
-            
-            var factory = new MqttFactory ();
-        mqttClient = factory.CreateMqttClient ();
-
-        var options = new MqttClientOptionsBuilder ()
-            .WithTcpServer ("192.168.1.4",  1883)
-            .WithClientId ("Unity.client")//Guid.NewGuid ().ToString ())
-            .WithCredentials ("your_MQTT_username", "your_MQTT_password")
-            .WithTls ()
-            .Build ();
-
-        mqttClient.Connected += async (s, e) =>
-        {
-            Debug.Log ("MQTTブローカに接続しました");
-            await mqttClient.SubscribeAsync (
-                new TopicFilterBuilder ()
-                .WithTopic ("itoyuNineAxis")
-                .Build ());
-            Debug.Log ("指定したトピックをSubscribeしました");
-        };
-        mqttClient.Disconnected += async (s, e) =>
-        {
-            if (e.Exception == null)
-            {
-                Debug.Log ("サーバとの通信を切断しました");
-                return;
-            }
-
-            Debug.Log ("サーバから切断されました。5秒後に再接続します");
-        };
-        mqttClient.ApplicationMessageReceived += (s, e) =>
-        {
-            var message = System.Text.Encoding.UTF8.GetString (e.ApplicationMessage.Payload);
-            Debug.Log ($"メッセージ受信 : {message}");
-            
-        };
-
-        await mqttClient.ConnectAsync (options);
-
-
-    }
-    */
 }
